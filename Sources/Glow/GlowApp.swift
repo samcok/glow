@@ -24,10 +24,20 @@ struct GlowApp: App {
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private let popover = NSPopover()
+    private var demoWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ n: Notification) {
         if ProcessInfo.processInfo.environment["GLOW_SELFTEST"] == "1" { selfTest(); exit(0) }   // ./build.sh --test
         Shared.hue.start()
+        if Shared.hue.demoSetup {   // GLOW_DEMO_SETUP: the Window scene doesn't open by itself here, so host the main view by hand
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 680), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            w.contentView = NSHostingView(rootView: MainView(hue: Shared.hue)); w.setFrameTopLeftPoint(NSPoint(x: 100, y: NSScreen.screens[0].frame.maxY - 100)); w.isReleasedWhenClosed = false; w.level = .floating
+            demoWindow = w; NSApp.activate(ignoringOtherApps: true); w.makeKeyAndOrderFront(nil)
+            FileHandle.standardError.write(Data("winid \(w.windowNumber)\n".utf8))   // for screencapture -l
+            if ProcessInfo.processInfo.environment["GLOW_DEMO_SETUP_AUTO"] == "1" {   // headless test: click the fake bridge after 2.5 s
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { Shared.pairing.pair(host: "192.168.1.2", id: "demo") }
+            }
+        }
         popover.behavior = .transient
         let host = NSHostingController(rootView: PopoverView(hue: Shared.hue))
         host.sizingOptions = .preferredContentSize
@@ -136,7 +146,7 @@ struct PopoverView: View {
         let current = Binding(get: { sel.v ?? hue.rooms.first?.id }, set: { sel.v = $0 })
         let room = hue.rooms.first(where: { $0.id == current.wrappedValue })
         Group {
-            Gate(hue: hue) {
+            Gate(hue: hue, compact: true) {
                 VStack(spacing: 0) {
                     HStack {
                         Picker("Room", selection: current) {

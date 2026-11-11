@@ -86,7 +86,11 @@ final class Box<T>: ObservableObject {
     var cfg: BridgeConfig?
     var pinMismatch = false
     let demo = ProcessInfo.processInfo.environment["GLOW_DEMO"] == "1"
-    var configured: Bool { demo || cfg != nil }
+    // GLOW_DEMO_SETUP=1: unpaired setup screen with a fake bridge; fake success loads the demo rooms.
+    let demoSetup = ProcessInfo.processInfo.environment["GLOW_DEMO_SETUP"] == "1"
+    var demoPaired = false
+    var configured: Bool { demoSetup ? demoPaired : (demo || cfg != nil) }
+    func finishDemoSetup() { loadDemo(); demoPaired = true }
 
     @ObservationIgnored private var session = URLSession.shared
     @ObservationIgnored private var runTask: Task<Void, Never>?

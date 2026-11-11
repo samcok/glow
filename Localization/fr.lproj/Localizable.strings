@@ -28,6 +28,7 @@
 "Can't connect to the bridge: %@" = "Connexion au pont impossible : %@";
 "Set up your Hue Bridge" = "Configurer votre pont Hue";
 "Press the round link button on the bridge. Glow connects as soon as you do." = "Appuyez sur le gros bouton rond du pont. Glow se connecte dès que vous le faites.";
+"Press the round button on your bridge" = "Appuyez sur le bouton rond de votre pont";
 "Waiting for the button…" = "En attente du bouton…";
 "Searching…" = "Recherche…";
 "Find my bridge" = "Trouver mon pont";

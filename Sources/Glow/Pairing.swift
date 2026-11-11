@@ -126,13 +126,19 @@ func browseBridges(seconds: Double = 4) async -> [Pairing.Found] {
     var found: [Found] = []
     var searching = false
     var waiting = false          // link button step
+    var succeeded = false        // key received: Setup plays its exit, then calls commit()
+    @ObservationIgnored private var commitAction: (() -> Void)?
     var message: String?
 
     @ObservationIgnored private var task: Task<Void, Never>?
     private let hue: Hue
     init(hue: Hue) { self.hue = hue }
 
+    /// Called by Setup once its exit animation is done: applies the config so Gate shows the app.
+    func commit() { let a = commitAction; commitAction = nil; succeeded = false; a?() }
+
     func find() {
+        if hue.demoSetup { found = [Found(id: "demo", internalipaddress: "192.168.1.2")]; return }
         searching = true; message = nil; found = []
         task = Task {
             defer { searching = false }
@@ -155,6 +161,16 @@ func browseBridges(seconds: Double = 4) async -> [Pairing.Found] {
         }
         cancel()
         waiting = true; message = nil
+        if hue.demoSetup {   // fake link button press after 4 s, no network
+            task = Task {
+                defer { waiting = false }
+                try? await Task.sleep(for: .seconds(4))
+                if Task.isCancelled { return }
+                commitAction = { [hue] in hue.finishDemoSetup() }
+                succeeded = true
+            }
+            return
+        }
         task = Task {
             defer { waiting = false }
             let trust = Trust(ip: host, pin: nil)
@@ -169,7 +185,8 @@ func browseBridges(seconds: Double = 4) async -> [Pairing.Found] {
                     let items = (try? JSONSerialization.jsonObject(with: d)) as? [[String: Any]] ?? []
                     if let ok = items.first?["success"] as? [String: Any], let key = ok["username"] as? String, let pin = trust.seen {
                         if BridgeStore.save(BridgeConfig(ip: host, pin: pin, id: id, key: key)) {
-                            hue.cfg = BridgeStore.load(); hue.start()
+                            commitAction = { [hue] in hue.cfg = BridgeStore.load(); hue.start() }
+                            succeeded = true
                         } else { message = String(localized: "Could not save the key in the Keychain.") }
                         return
                     }
@@ -192,44 +209,79 @@ func browseBridges(seconds: Double = 4) async -> [Pairing.Found] {
 
 struct Setup: View {
     let pairing: Pairing
+    var compact = false
     @StateObject private var host = Box("")
+    @StateObject private var phase = Box(BridgePhase.hidden)
+    @StateObject private var float = Box(false)
+    @StateObject private var shadow = Box(0.0)   // shadow opacity follows the entrance/exit
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let p = pairing
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Set up your Hue Bridge").font(.headline)
-            if p.waiting {
-                Text("Press the round link button on the bridge. Glow connects as soon as you do.")
-                HStack {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting for the button…").foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Cancel") { p.cancel() }
-                }
+        let size: CGFloat = compact ? 110 : 140
+        VStack(spacing: 14) {
+            Spacer(minLength: 0)
+            ZStack {
+                Ellipse().fill(.black).frame(width: size * 0.8, height: size * 0.11).blur(radius: 7)
+                    .scaleEffect(float.v ? 0.78 : 1).opacity((float.v ? 0.25 : 0.45) * shadow.v)
+                    .offset(y: size * 0.5 + 18)
+                BridgeArt(phase: phase.v, pulse: p.waiting, reduceMotion: reduceMotion)
+                    .frame(width: size * BridgeArt.pad, height: size * BridgeArt.pad)
+                    .frame(width: size, height: size)   // layout size; the 3D view overflows so scale 3 is not clipped
+                    .offset(y: float.v ? -8 : 0).allowsHitTesting(false)
+            }.frame(height: size + 40)
+            Text(p.waiting || p.succeeded ? "Press the round button on your bridge" : "Set up your Hue Bridge")
+                .font(.headline).multilineTextAlignment(.center).contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.25), value: p.waiting || p.succeeded)
+            controls(p)
+            Spacer(minLength: 0)
+        }
+        .font(.callout)
+        .padding(20).frame(maxWidth: 380).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            if p.found.isEmpty && !p.searching && !p.waiting { p.find() }   // search without a click
+            phase.v = .shown
+            withAnimation(.easeInOut(duration: reduceMotion ? 0.3 : 2.0)) { shadow.v = 1 }
+            if !reduceMotion { withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) { float.v = true } }
+        }
+        .task(id: p.succeeded) {
+            guard p.succeeded else { return }
+            phase.v = .exit
+            withAnimation(.easeOut(duration: reduceMotion ? 0.3 : 0.4)) { shadow.v = 0 }
+            try? await Task.sleep(for: .seconds(0.45))
+            if !Task.isCancelled { withAnimation(.easeOut(duration: 0.3)) { p.commit() } }
+        }
+    }
+
+    @ViewBuilder private func controls(_ p: Pairing) -> some View {
+        VStack(spacing: 8) {
+            if p.succeeded {
+                EmptyView()
+            } else if p.waiting {
+                Button("Cancel") { p.cancel() }.buttonStyle(.plain).foregroundStyle(.secondary)
             } else {
-                Button(p.searching ? "Searching…" : "Find my bridge") { p.find() }.buttonStyle(.glassProminent).disabled(p.searching)
+                Button(p.searching ? "Searching…" : "Find my bridge") { p.find() }.controlSize(.small).buttonStyle(.glass).disabled(p.searching)
                 ForEach(p.found) { b in
                     Button { p.pair(host: b.internalipaddress, id: b.id) } label: {
                         Label("Hue Bridge (\(b.internalipaddress))", systemImage: "wifi.router").frame(maxWidth: .infinity, alignment: .leading)
-                    }.buttonStyle(.glass)
+                    }.buttonStyle(.glass).controlSize(.small)
                 }
-                Text("Or type its address:").font(.callout).foregroundStyle(.secondary)
+                Text("Or type its address:").font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    TextField("IP address or .local name", text: $host.v).textFieldStyle(.roundedBorder)
+                    TextField("IP address or .local name", text: $host.v).textFieldStyle(.roundedBorder).controlSize(.small)
                         .onSubmit { p.pair(host: host.v.trimmingCharacters(in: .whitespaces)) }
-                    Button("Connect") { p.pair(host: host.v.trimmingCharacters(in: .whitespaces)) }.disabled(host.v.isEmpty)
+                    Button("Connect") { p.pair(host: host.v.trimmingCharacters(in: .whitespaces)) }.controlSize(.small).disabled(host.v.isEmpty)
                 }
             }
             if let m = p.message { Text(m).font(.caption).foregroundStyle(.red) }
-        }
-        .padding(20).frame(maxWidth: 380).frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { if p.found.isEmpty && !p.searching && !p.waiting { p.find() } }   // search without a click
+        }.frame(maxWidth: 300)
     }
 }
 
 /// Shows setup or the certificate warning until a bridge is paired and trusted.
 struct Gate<Content: View>: View {
     let hue: Hue
+    var compact = false
     @ViewBuilder var content: () -> Content
     var body: some View {
         if hue.pinMismatch {
@@ -237,6 +289,6 @@ struct Gate<Content: View>: View {
                 Text("The bridge certificate changed. If you reset or replaced your bridge, pair again.")
                 Button("Pair again") { hue.forget() }.buttonStyle(.glassProminent)
             }.padding(20).frame(maxWidth: 380).frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if !hue.configured { Setup(pairing: Shared.pairing) } else { content() }
+        } else if !hue.configured { Setup(pairing: Shared.pairing, compact: compact) } else { content() }
     }
 }
