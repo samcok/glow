@@ -3,6 +3,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 swift build -c release
+# No XCTest/Swift Testing with the Command Line Tools only: ./build.sh --test runs the in-app self-checks instead.
+if [ "${1:-}" = "--test" ]; then GLOW_SELFTEST=1 "$(swift build -c release --show-bin-path)/Glow"; exit $?; fi
 APP=build/Glow.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
@@ -41,7 +43,8 @@ mkdir -p "$APP/Contents/Resources"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Localization/*.lproj "$APP/Contents/Resources/"
 xattr -cr "$APP"
-codesign --force --options runtime --entitlements Glow.entitlements --sign - "$APP"
+# shortcut: the requirement is only the bundle id, so any binary with this identifier passes; upgrade = sign with a Developer ID.
+codesign --force --options runtime --entitlements Glow.entitlements -r='designated => identifier "io.github.samcok.glow"' --sign - "$APP"
 rm -f build/Glow.zip
 ditto -c -k --keepParent "$APP" build/Glow.zip
 echo "OK: build/Glow.zip"

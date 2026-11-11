@@ -42,16 +42,6 @@ enum HueColor {
         h = (h / 6).truncatingRemainder(dividingBy: 1)
         return (h < 0 ? h + 1 : h, d / hi)
     }
-
-    static func selfCheck() {
-        for h in stride(from: 0.0, to: 1, by: 1.0 / 12) {
-            for s in [0.4, 0.7, 1.0] {
-                let r = hs(xy(h: h, s: s))
-                let dh = abs(r.h - h)
-                assert(min(dh, 1 - dh) < 0.01 && abs(r.s - s) < 0.01, "xy round-trip failed for h=\(h) s=\(s): \(r)")
-            }
-        }
-    }
 }
 
 struct RGB: Equatable {

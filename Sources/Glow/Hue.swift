@@ -90,12 +90,17 @@ final class Box<T>: ObservableObject {
 
     @ObservationIgnored private var session = URLSession.shared
     @ObservationIgnored private var runTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?   // at most one event-driven refresh pending/in flight
     @ObservationIgnored private var pending: [String: [String: Any]] = [:]
     @ObservationIgnored private var lastSent: [String: Date] = [:]
     @ObservationIgnored private var touched: [String: Date] = [:]   // ignore echoes of our own writes
 
     init() {
         if demo { loadDemo() } else { cfg = BridgeStore.load() }
+        // After sleep the old stream is often dead: reconnect (run() reloads everything).
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.start() }
+        }
     }
 
     /// (Re)start the connection with the current config.
@@ -148,7 +153,8 @@ final class Box<T>: ObservableObject {
             do {
                 _ = try await call(path, method, body)
                 if reloadScenes { scenes = try await get("scene") }
-                if refresh { for d in [0.5, 1.5] { try? await Task.sleep(for: .seconds(d)); await refreshLights() } }
+                if refresh { for d in [0.5, 1.5] { try? await Task.sleep(for: .seconds(d)); await self.refresh() } }
+                error = nil
             } catch { self.error = String(localized: "Bridge error: \(error.localizedDescription)") }
         }
     }
@@ -169,19 +175,14 @@ final class Box<T>: ObservableObject {
     // MARK: Load + live updates
 
     private func run() async {
+        var failures = 0, delay = 3.0
         while !Task.isCancelled {
             do {
-                let r: [Room] = try await get("room")
-                let l: [Light] = try await get("light")
-                let g: [GroupedLight] = try await get("grouped_light")
-                rooms = r.sorted { $0.metadata.name < $1.metadata.name }
-                lights = Dictionary(l.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-                groups = Dictionary(g.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-                scenes = try await get("scene")
-                error = nil
+                try await load()
+                error = nil; failures = 0; delay = 3
                 var r2 = try request("/eventstream/clip/v2")
                 r2.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                r2.timeoutInterval = 86400
+                r2.timeoutInterval = 300   // idle time between bytes: a dead stream (e.g. after sleep) is dropped and reopened
                 let (bytes, _) = try await session.bytes(for: r2)
                 // Read lines by hand: a line over 1 MB is dropped instead of buffered.
                 var line = Data(), skipping = false
@@ -194,20 +195,53 @@ final class Box<T>: ObservableObject {
                     line = Data(); skipping = false
                 }
             } catch {
-                if pinMismatch { return }
+                if Task.isCancelled || pinMismatch { return }
                 self.error = String(localized: "Can't connect to the bridge: \(error.localizedDescription)")
+                failures += 1
+                if failures % 3 == 0 { await rediscover() }
             }
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(delay))
+            delay = min(delay * 2, 60)
         }
     }
 
-    /// Fresh GET of lights and groups: fallback for events we missed or ignored (scene recalls, popover opened).
-    func refreshLights() async {
-        guard cfg != nil, let l: [Light] = try? await get("light"), let g: [GroupedLight] = try? await get("grouped_light") else { return }
+    /// The bridge may have a new IP (DHCP): look for it by id on the network and keep pin and key.
+    private func rediscover() async {
+        guard let c = cfg else { return }
+        let found = await browseBridges()
+        guard !Task.isCancelled, let b = found.first(where: { $0.id.caseInsensitiveCompare(c.id) == .orderedSame && $0.internalipaddress != c.ip }) else { return }
+        UserDefaults.standard.set(b.internalipaddress, forKey: "bridgeIP")
+        cfg?.ip = b.internalipaddress
+        start()   // new session + Trust for the new IP; cancels this task
+    }
+
+    /// Full GET of everything we show. Our own recent writes are kept (their echo is still in flight).
+    private func load() async throws {
+        let r: [Room] = try await get("room"), l: [Light] = try await get("light")
+        let g: [GroupedLight] = try await get("grouped_light"), s: [HueScene] = try await get("scene")
         let now = Date()
+        func fresh(_ id: String) -> Bool { now.timeIntervalSince(touched[id] ?? .distantPast) > 0.6 }
         withAnimation(Hue.ease) {
-            for x in l where now.timeIntervalSince(touched[x.id] ?? .distantPast) > 0.6 { lights[x.id] = x }
-            for x in g where now.timeIntervalSince(touched[x.id] ?? .distantPast) > 0.6 { groups[x.id] = x }
+            rooms = r.sorted { $0.metadata.name < $1.metadata.name }
+            scenes = s
+            lights = Dictionary(l.map { ($0.id, fresh($0.id) ? $0 : (lights[$0.id] ?? $0)) }, uniquingKeysWith: { a, _ in a })
+            groups = Dictionary(g.map { ($0.id, fresh($0.id) ? $0 : (groups[$0.id] ?? $0)) }, uniquingKeysWith: { a, _ in a })
+        }
+    }
+
+    /// Fresh GET: fallback for events we missed or ignored (scene recalls, popover opened, new rooms/scenes).
+    func refresh() async {
+        guard cfg != nil else { return }
+        try? await load()
+    }
+
+    /// Debounced: events can come in bursts, so wait 1 s and refresh once.
+    private func scheduleRefresh() {
+        guard refreshTask == nil else { return }
+        refreshTask = Task {
+            try? await Task.sleep(for: .seconds(1))
+            await refresh()
+            refreshTask = nil
         }
     }
 
@@ -217,9 +251,13 @@ final class Box<T>: ObservableObject {
     }
 
     private func merge(_ json: String) {
-        struct Event: Decodable { var data: [Lossy<Patch>] }
+        struct Event: Decodable { var type: String; var data: [Lossy<Patch>] }
         guard let events = try? JSONDecoder().decode([Event].self, from: Data(json.utf8)) else { return }
-        withAnimation(Hue.ease) { apply(events.flatMap(\.data).compactMap(\.v)) }
+        let patches = events.flatMap(\.data).compactMap(\.v)
+        withAnimation(Hue.ease) { apply(patches) }
+        if events.contains(where: { $0.type == "add" || $0.type == "delete" }) || patches.contains(where: { ["room", "zone", "scene"].contains($0.type) }) {
+            scheduleRefresh()
+        }
     }
 
     private func apply(_ patches: [Patch]) {

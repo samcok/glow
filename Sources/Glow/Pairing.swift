@@ -86,30 +86,32 @@ func browseBridges(seconds: Double = 4) async -> [Pairing.Found] {
         let browser = NWBrowser(for: .bonjourWithTXTRecord(type: "_hue._tcp", domain: "local."), using: .tcp)
         let tcp = NWParameters.tcp
         (tcp.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options)?.version = .v4
-        var found: [String: Pairing.Found] = [:], conns: [NWConnection] = []   // only touched on q
+        final class Acc: @unchecked Sendable { var found: [String: Pairing.Found] = [:]; var conns: [NWConnection] = [] }
+        let acc = Acc()   // only touched on queue q
         browser.browseResultsChangedHandler = { results, _ in
             for r in results {
-                var id = ""
-                if case .bonjour(let txt) = r.metadata { id = txt["bridgeid"] ?? "" }
-                if id.isEmpty, case .service(let name, _, _, _) = r.endpoint { id = name }
-                guard found[id] == nil else { continue }
+                let id: String
+                if case .bonjour(let txt) = r.metadata, let b = txt["bridgeid"], !b.isEmpty { id = b }
+                else if case .service(let name, _, _, _) = r.endpoint { id = name }
+                else { id = "" }
+                guard acc.found[id] == nil else { continue }
                 let c = NWConnection(to: r.endpoint, using: tcp)
                 c.stateUpdateHandler = { s in
                     guard case .ready = s else { return }
                     if case .hostPort(.ipv4(let a), _)? = c.currentPath?.remoteEndpoint {
                         let ip = String("\(a)".split(separator: "%")[0])   // drop the "%en0" interface suffix
-                        if validHost(ip) { found[id] = Pairing.Found(id: id, internalipaddress: ip) }
+                        if validHost(ip) { acc.found[id] = Pairing.Found(id: id, internalipaddress: ip) }
                     }
                     c.cancel()
                 }
-                conns.append(c)
+                acc.conns.append(c)
                 c.start(queue: q)
             }
         }
         browser.start(queue: q)
         q.asyncAfter(deadline: .now() + seconds) {
-            browser.cancel(); conns.forEach { $0.cancel() }
-            cont.resume(returning: Array(found.values))
+            browser.cancel(); acc.conns.forEach { $0.cancel() }
+            cont.resume(returning: Array(acc.found.values))
         }
     }
 }

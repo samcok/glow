@@ -26,9 +26,7 @@ struct GlowApp: App {
     private let popover = NSPopover()
 
     func applicationDidFinishLaunching(_ n: Notification) {
-        #if DEBUG
-        HueColor.selfCheck()
-        #endif
+        if ProcessInfo.processInfo.environment["GLOW_SELFTEST"] == "1" { selfTest(); exit(0) }   // ./build.sh --test
         Shared.hue.start()
         popover.behavior = .transient
         let host = NSHostingController(rootView: PopoverView(hue: Shared.hue))
@@ -73,7 +71,7 @@ struct GlowApp: App {
                 w.collectionBehavior.formUnion([.fullScreenAuxiliary, .canJoinAllSpaces])
                 w.makeKey()
             }
-            Task { await Shared.hue.refreshLights() }
+            Task { await Shared.hue.refresh() }
         }
     }
 
