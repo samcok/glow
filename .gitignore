@@ -1,5 +1,5 @@
 .build/
-build/
+build.noindex/
 .hue-key.json
 .DS_Store
 *.xcuserstate

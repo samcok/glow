@@ -49,7 +49,7 @@ You need the Xcode Command Line Tools.
 ./build.sh --install
 ```
 
-This builds, signs and zips `build/Glow.app`, and copies it to `~/Applications`.
+This builds, signs and zips `build.noindex/Glow.app`, and copies it to `~/Applications`.
 
 ## Privacy and security
 

@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 swift build -c release
 # No XCTest/Swift Testing with the Command Line Tools only: ./build.sh --test runs the in-app self-checks instead.
 if [ "${1:-}" = "--test" ]; then GLOW_SELFTEST=1 "$(swift build -c release --show-bin-path)/Glow"; exit $?; fi
-APP=build/Glow.app
+APP=build.noindex/Glow.app   # .noindex: Spotlight skips it, so search only finds the installed app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp "$(swift build -c release --show-bin-path)/Glow" "$APP/Contents/MacOS/Glow"
@@ -30,24 +30,24 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 # App icon (generated once)
-if [ ! -f build/AppIcon.icns ]; then
-  swift tools/make-icon.swift build/icon-1024.png
-  SET=build/AppIcon.iconset; rm -rf "$SET"; mkdir -p "$SET"
+if [ ! -f build.noindex/AppIcon.icns ]; then
+  swift tools/make-icon.swift build.noindex/icon-1024.png
+  SET=build.noindex/AppIcon.iconset; rm -rf "$SET"; mkdir -p "$SET"
   for s in 16 32 128 256 512; do
-    sips -z $s $s build/icon-1024.png --out "$SET/icon_${s}x${s}.png" >/dev/null
-    sips -z $((s*2)) $((s*2)) build/icon-1024.png --out "$SET/icon_${s}x${s}@2x.png" >/dev/null
+    sips -z $s $s build.noindex/icon-1024.png --out "$SET/icon_${s}x${s}.png" >/dev/null
+    sips -z $((s*2)) $((s*2)) build.noindex/icon-1024.png --out "$SET/icon_${s}x${s}@2x.png" >/dev/null
   done
-  iconutil -c icns "$SET" -o build/AppIcon.icns
+  iconutil -c icns "$SET" -o build.noindex/AppIcon.icns
 fi
 mkdir -p "$APP/Contents/Resources"
-cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+cp build.noindex/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Localization/*.lproj "$APP/Contents/Resources/"
 xattr -cr "$APP"
 # Ad-hoc signing keeps the default cdhash requirement: macOS asks once per update for Keychain access. A Developer ID would remove that prompt.
 codesign --force --options runtime --entitlements Glow.entitlements --sign - "$APP"
-rm -f build/Glow.zip
-ditto -c -k --keepParent "$APP" build/Glow.zip
-echo "OK: build/Glow.zip"
+rm -f build.noindex/Glow.zip
+ditto -c -k --keepParent "$APP" build.noindex/Glow.zip
+echo "OK: build.noindex/Glow.zip"
 if [ "${1:-}" = "--install" ]; then
   mkdir -p ~/Applications
   rm -rf ~/Applications/Glow.app
