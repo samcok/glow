@@ -1,6 +1,4 @@
 import SwiftUI
-import AppKit
-import Observation
 
 // MARK: - Models (only the fields we use)
 
@@ -50,7 +48,6 @@ struct HueScene: Decodable, Identifiable {
         (palette?.color ?? []).compactMap { $0.color.map { HueColor.rgb($0.xy) } }
             + (palette?.color_temperature ?? []).compactMap { $0.color_temperature.map { HueColor.white($0.t) } }
     }
-    var hasPalette: Bool { !(palette?.color ?? []).isEmpty || !(palette?.color_temperature ?? []).isEmpty }
 }
 /// Partial resource from the event stream.
 struct Patch: Decodable {

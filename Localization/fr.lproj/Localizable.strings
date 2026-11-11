@@ -11,7 +11,6 @@
 "Deselect" = "Désélectionner";
 "Select all lights" = "Sélectionner toutes les lumières";
 "Deselect lights" = "Désélectionner les lumières";
-"Mode" = "Mode";
 "Color" = "Couleur";
 "White" = "Blanc";
 "Scenes" = "Scènes";
@@ -40,9 +39,9 @@
 "The bridge certificate changed. If you reset or replaced your bridge, pair again." = "Le certificat du pont a changé. Si vous avez réinitialisé ou remplacé votre pont, associez-le de nouveau.";
 "Pair again" = "Associer de nouveau";
 "No bridge found on your network. Type its address below." = "Aucun pont trouvé sur votre réseau. Saisissez son adresse ci-dessous.";
-"Search failed. Check your connection or type the bridge address below." = "La recherche a échoué. Vérifiez votre connexion ou saisissez l'adresse du pont ci-dessous.";
 "That is not an IP address or a .local name." = "Ce n'est ni une adresse IP ni un nom .local.";
 "Could not save the key in the Keychain." = "Impossible d'enregistrer la clé dans le trousseau.";
 "The bridge refused the request." = "Le pont a refusé la demande.";
 "Can't reach the bridge at %@." = "Impossible de joindre le pont à l'adresse %@.";
 "The link button was not pressed in time. Try again." = "Le bouton du pont n'a pas été pressé à temps. Réessayez.";
+"Hue Bridge (%@)" = "Pont Hue (%@)";

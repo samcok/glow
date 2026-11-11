@@ -8,7 +8,6 @@ extension View {
     }
 }
 
-/// Light dot used on the wheel and the temperature bar: a glass circle tinted with the light's colour.
 /// Pointer hover feedback: slight brighten, plus an optional lift. Lift is skipped with Reduce Motion.
 struct HoverLift: ViewModifier {
     let scale: CGFloat
@@ -27,6 +26,7 @@ extension View {
     func hoverLift(scale: CGFloat = 1) -> some View { modifier(HoverLift(scale: scale)) }
 }
 
+/// Light dot used on the wheel and the temperature bar: a glass circle tinted with the light's colour.
 struct LightDot: View {
     let light: Light
     let picked: Bool

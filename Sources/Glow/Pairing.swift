@@ -25,7 +25,7 @@ enum BridgeStore {
         return BridgeConfig(ip: ip, pin: pin, id: id, key: key)
     }
 
-    @discardableResult static func save(_ c: BridgeConfig) -> Bool {
+    static func save(_ c: BridgeConfig) -> Bool {
         forget()
         var q = query(c.id)
         q[kSecValueData as String] = Data(c.key.utf8)
