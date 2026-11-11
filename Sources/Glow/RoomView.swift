@@ -30,7 +30,7 @@ struct RoomView: View {
                 if let e = hue.error { Text(e).font(.caption).foregroundStyle(.red) }
                 brightness(g, tint, roomOn)
                 if compact {
-                    colorPanel.panel(12).frame(maxWidth: .infinity)
+                    colorPanel.frame(maxWidth: .infinity).panel(12)   // full-width panel, content centered
                     lightsPanel(lights, toggleAll)
                 } else {
                     HStack(alignment: .top, spacing: 16) {
