@@ -68,7 +68,11 @@ struct GlowApp: App {
             popover.performClose(nil)
         } else {
             popover.show(relativeTo: b.bounds, of: b, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            if let w = popover.contentViewController?.view.window {
+                // Without this the popover can't appear over another app's full-screen Space.
+                w.collectionBehavior.formUnion([.fullScreenAuxiliary, .canJoinAllSpaces])
+                w.makeKey()
+            }
             Task { await Shared.hue.refreshLights() }
         }
     }

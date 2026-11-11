@@ -23,7 +23,6 @@ struct RoomView: View {
                 Text("Color").tag(0)
                 Text("White").tag(1)
             }.pickerStyle(.segmented).labelsHidden()
-            if compact { HStack { Spacer(); toggleAll } }
             control(lights, size)
         }.frame(width: size)
         let content = GlassEffectContainer(spacing: 0) {
@@ -32,6 +31,7 @@ struct RoomView: View {
                 brightness(g, tint, roomOn)
                 if compact {
                     colorPanel.panel(12).frame(maxWidth: .infinity)
+                    lightsPanel(lights, toggleAll)
                 } else {
                     HStack(alignment: .top, spacing: 16) {
                         colorPanel.panel().fixedSize(horizontal: true, vertical: false)
