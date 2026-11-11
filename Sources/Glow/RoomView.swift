@@ -44,6 +44,11 @@ struct RoomView: View {
         .toolbar {
             if !compact {
                 ToolbarItem { Toggle("Room on", isOn: roomOn).toggleStyle(.switch).tint(tint) }
+                ToolbarSpacer(.flexible)   // pushes the "more" menu to the far right
+                ToolbarItem {
+                    Menu { Button("Forget bridge", role: .destructive) { hue.forget() } } label: { Image(systemName: "ellipsis.circle") }
+                        .menuIndicator(.hidden).accessibilityLabel("More")
+                }
             }
         }
     }

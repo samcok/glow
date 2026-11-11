@@ -114,10 +114,6 @@ struct MainView: View {
                 // Room switcher in place of the title: a native menu button, scales to any number of rooms.
                 .toolbar(removing: .title)
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Menu { Button("Forget bridge", role: .destructive) { hue.forget() } } label: { Image(systemName: "ellipsis.circle") }
-                            .menuIndicator(.hidden).accessibilityLabel("More")
-                    }
                     ToolbarItem(placement: .navigation) {
                         Menu {
                             Picker("Room", selection: current) {
