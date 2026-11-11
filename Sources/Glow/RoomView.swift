@@ -19,10 +19,8 @@ struct RoomView: View {
             Label(all ? "Deselect" : "Select all", systemImage: all ? "xmark.circle" : "checkmark.circle")
         }.labelStyle(.titleAndIcon).buttonStyle(.glass).accessibilityLabel(all ? "Deselect lights" : "Select all lights")
         let colorPanel = VStack(spacing: 12) {
-            Picker("Mode", selection: Binding(get: { white.v ? 1 : 0 }, set: { white.v = $0 == 1 })) {
-                Text("Color").tag(0)
-                Text("White").tag(1)
-            }.pickerStyle(.segmented).labelsHidden()
+            // Buttons instead of a segmented Picker: macOS ignores .tint on segmented pickers.
+            HStack(spacing: 6) { modeButton("Color", false, tint); modeButton("White", true, tint) }
             control(lights, size)
         }.frame(width: size)
         let content = GlassEffectContainer(spacing: 0) {
@@ -48,6 +46,12 @@ struct RoomView: View {
                 ToolbarItem { Toggle("Room on", isOn: roomOn).toggleStyle(.switch).tint(tint) }
             }
         }
+    }
+
+    @ViewBuilder private func modeButton(_ title: LocalizedStringKey, _ w: Bool, _ tint: Color) -> some View {
+        let b = Button { white.v = w } label: { Text(title).frame(minWidth: 56) }
+        if white.v == w { b.buttonStyle(.glassProminent).tint(tint).accessibilityAddTraits(.isSelected) }
+        else { b.buttonStyle(.glass) }
     }
 
     @ViewBuilder private func control(_ lights: [Light], _ size: CGFloat) -> some View {
