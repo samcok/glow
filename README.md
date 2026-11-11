@@ -24,12 +24,22 @@ A Mac menu bar app for Philips Hue lights.
 
 ## Install
 
-1. Download `Glow.zip` from the Releases page and move Glow to your Applications folder.
-2. Glow is not notarized. On first launch, right-click it and choose Open, or go to System Settings > Privacy & Security and click Open Anyway.
+1. Open the [latest release](https://github.com/samcok/glow/releases/latest) and download `Glow.zip`. Safari unzips it for you; with another browser, double-click the zip.
+2. Drag **Glow** into your **Applications** folder.
+3. Open Glow. Glow is not notarized by Apple yet, so macOS blocks the first launch with a message saying it can't verify the app. Click **Done** (not Move to Trash).
+4. Open **System Settings > Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to the line about Glow. Confirm with your password or Touch ID, then click **Open**. You only do this once.
 
 ## First launch
 
-Glow looks for your bridge on the local network as soon as it opens (allow local network access if macOS asks). Pick your bridge, or type its address, then press the round link button on top of it. Glow pairs within a few seconds and saves the key in your Keychain. Use "Forget bridge" from the menu bar icon or the window to start over.
+1. When macOS asks whether Glow can find devices on your local network, click **Allow**. Without it, Glow can't see your bridge.
+2. Glow looks for your bridge and shows it as "Hue Bridge (192.168.x.x)". Click it. If it doesn't show up, type the bridge's IP address (you'll find it in the Hue app under Settings > Bridges).
+3. Press the round link button on top of the bridge within a minute. Your rooms appear a few seconds later.
+
+Glow lives in the menu bar: click the bulb icon for quick controls, right-click it to open the full window. Closing the window removes Glow from the Dock; it keeps running in the menu bar. On a Mac with a notch, a crowded menu bar can hide the icon behind the notch. To start over with another bridge, choose **Forget bridge** from the right-click menu.
+
+## Update
+
+Download the new `Glow.zip` and replace Glow in Applications. On first launch of the new version, macOS asks for access to Glow's key in the Keychain: enter your password and click **Always Allow**.
 
 ## Build from source
 
