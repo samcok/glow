@@ -43,8 +43,8 @@ mkdir -p "$APP/Contents/Resources"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp -R Localization/*.lproj "$APP/Contents/Resources/"
 xattr -cr "$APP"
-# shortcut: the requirement is only the bundle id, so any binary with this identifier passes; upgrade = sign with a Developer ID.
-codesign --force --options runtime --entitlements Glow.entitlements -r='designated => identifier "io.github.samcok.glow"' --sign - "$APP"
+# Ad-hoc signing keeps the default cdhash requirement: macOS asks once per update for Keychain access. A Developer ID would remove that prompt.
+codesign --force --options runtime --entitlements Glow.entitlements --sign - "$APP"
 rm -f build/Glow.zip
 ditto -c -k --keepParent "$APP" build/Glow.zip
 echo "OK: build/Glow.zip"

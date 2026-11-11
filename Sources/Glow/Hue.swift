@@ -209,7 +209,12 @@ final class Box<T>: ObservableObject {
     private func rediscover() async {
         guard let c = cfg else { return }
         let found = await browseBridges()
-        guard !Task.isCancelled, let b = found.first(where: { $0.id.caseInsensitiveCompare(c.id) == .orderedSame && $0.internalipaddress != c.ip }) else { return }
+        guard !Task.isCancelled, let b = found.first(where: { $0.id.caseInsensitiveCompare(c.id) == .orderedSame && $0.internalipaddress != c.ip }),
+              let probe = bridgeURL(b.internalipaddress, "/api/config") else { return }
+        // Bonjour is unauthenticated: only move if the new address serves the pinned certificate (no key is sent here).
+        let s = URLSession(configuration: .ephemeral, delegate: Trust(ip: b.internalipaddress, pin: c.pin), delegateQueue: nil)
+        defer { s.finishTasksAndInvalidate() }
+        guard (try? await s.data(from: probe)) != nil, !Task.isCancelled else { return }
         UserDefaults.standard.set(b.internalipaddress, forKey: "bridgeIP")
         cfg?.ip = b.internalipaddress
         start()   // new session + Trust for the new IP; cancels this task
